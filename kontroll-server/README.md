@@ -1,13 +1,10 @@
-# Mimer kontrollcentral – intern API-prototyp
+# Lokal verifieringscentral – utvecklingskandidat
+Körs på 127.0.0.1:8787 med Node.js 20+. API och webbgränssnitt är skrivskyddade. **Inte produktionsklart.**
 
-Denna Node.js-tjänst är en **lokal, skrivskyddad adapter** och inte en produktionsklar autentiserings- eller beslutsplattform. Den exponerar endast GET /api/v1/evidence på 127.0.0.1. Alla övriga metoder avvisas. Den kan inte skriva beslut, godkänna merge eller starta drift.
+Sätt `MIMER_CONTROL_TOKEN` till minst 32 slumpmässiga byte och `MIMER_CONTROL_EVIDENCE_FILE` till en lokal JSON-fil med `{"schema_version":1,"items":[]}`. Starta `node kontroll-server/server.mjs`.
 
-## Start
-Node.js 20+ krävs. Sätt MIMER_CONTROL_TOKEN (slumpmässig hemlighet om minst 32 byte), MIMER_CONTROL_EVIDENCE_FILE (lokal JSON-snapshot) och eventuellt MIMER_CONTROL_PORT; kör node kontroll-server/server.mjs.
+API-anrop kräver `Authorization: Bearer <token>`. Webbgränssnittet kräver samma header och är därför främst avsett för lokal API-testklient; en vanlig webbläsare kan inte öppna det utan en separat autentiserande lokal proxy. **Lägg aldrig token i URL, frontendkod eller publikt repo.**
 
-Exempel på filformat: {"schema_version":1,"items":[]}. Denna snapshot är **inte ett runtimebevis**. Svaret märks därför verified_runtime:false och local_unverified_snapshot.
+Posterna måste ha `category` = stop, gap, deviation eller decision. Övriga visningsfält kan anges: title, stage, status, baseline, candidate_sha, source, tests, attestation, provenance, next_step.
 
-## Säkerhetsgräns
-Koppla **inte** denna tjänst direkt till internet eller till det publika GitHub Pages-projektet. Bearer-token över HTTP får endast användas lokalt; produktionsåtkomst kräver separat autentiserad TLS-terminerande proxy, rollstyrd behörighet, CSRF-/sessionsskydd där relevant, revisionslogg, källvalidering, säkra svarsscheman och penetrationstest. Låt inte browsern innehålla hemligheter. Använd inte denna tjänst för beslutsskrivning. `noindex` är inte åtkomstskydd.
-
-GO/STOP och signerade attesteringar måste hämtas från auktoritativt evidenslager och får inte härledas från denna API-prototyp.
+Alla lokala snapshots märks uttryckligen som icke runtimeverifierade. Ingen automatisk GO-bedömning finns. Beslutsskrivning, signerade attesteringar, Mimer-arkivkoppling, identitetsstyrning, revisionslogg, källvalidering och driftsättning återstår. Publicera inte tjänsten direkt på internet; `noindex` är inte åtkomstskydd.
