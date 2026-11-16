@@ -1,24 +1,12 @@
-import http from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { timingSafeEqual } from 'node:crypto';
-const host='127.0.0.1';
-const port=Number(process.env.MIMER_CONTROL_PORT||8787);
-const token=process.env.MIMER_CONTROL_TOKEN;
-const evidenceFile=process.env.MIMER_CONTROL_EVIDENCE_FILE;
-if(!token || Buffer.byteLength(token)<32 || !evidenceFile) throw Error('Missing token (min 32 bytes) or evidence file');
-const valid=t=>{const a=Buffer.from(t||'');const b=Buffer.from(token);return a.length===b.length && timingSafeEqual(a,b)};
-const server=http.createServer(async(req,res)=>{
-  const headers={'Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'",'X-Content-Type-Options':'nosniff'};
-  const send=(code,body)=>{res.writeHead(code,{...headers,'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(body))};
-  if(!valid((req.headers.authorization||'').replace(/^Bearer /,'')))return send(401,{error:'unauthorized'});
-  if(req.method!=='GET')return send(405,{error:'read_only'});
-  if(req.url!=='/api/v1/evidence')return send(404,{error:'not_found'});
-  try {
-    const raw=await readFile(evidenceFile,'utf8');
-    if(Buffer.byteLength(raw)>1024*1024)return send(413,{error:'too_large'});
-    const doc=JSON.parse(raw);
-    if(doc.schema_version!==1 || !Array.isArray(doc.items))return send(422,{error:'invalid_schema'});
-    return send(200,{schema_version:1,source:'local_unverified_snapshot',verified_runtime:false,items:doc.items});
-  } catch {return send(503,{error:'evidence_unavailable'})}
-});
-server.listen(port,host,()=>console.log('Control read-only API bound to loopback',port));
+import http from 'node:http';import {readFile} from 'node:fs/promises';import {timingSafeEqual} from 'node:crypto';import {fileURLToPath} from 'node:url';import {resolve,dirname} from 'node:path';
+const port=Number(process.env.MIMER_CONTROL_PORT||8787),host='127.0.0.1',token=process.env.MIMER_CONTROL_TOKEN,file=process.env.MIMER_CONTROL_EVIDENCE_FILE;const base=dirname(fileURLToPath(import.meta.url));
+if(!token||Buffer.byteLength(token)<32||!file||!Number.isInteger(port)||port<1||port>65535)throw Error('Token >=32 bytes, evidence path and valid port required');
+const valid=t=>{const a=Buffer.from(t||''),b=Buffer.from(token);return a.length===b.length&&timingSafeEqual(a,b)};
+const paths={'/':'../kontroll/index.html','/kontroll.css':'../kontroll/kontroll.css','/kontroll.js':'../kontroll/kontroll.js','/styles.css':'../styles.css'};
+http.createServer(async(req,res)=>{const h={'Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY'};const send=(status,body,type='application/json; charset=utf-8')=>{res.writeHead(status,{...h,'Content-Type':type});res.end(type.startsWith('application/json')?JSON.stringify(body):body)};
+const auth=req.headers.authorization||'';if(!valid(auth.startsWith('Bearer ')?auth.slice(7):''))return send(401,{error:'unauthorized'});
+if(req.method!=='GET')return send(405,{error:'read_only'});
+if(req.url==='/api/v1/evidence'){try{const raw=await readFile(file,'utf8');if(Buffer.byteLength(raw)>1048576)return send(413,{error:'too_large'});const doc=JSON.parse(raw);if(doc.schema_version!==1||!Array.isArray(doc.items)||doc.items.length>500||doc.items.some(x=>!x||typeof x!=='object'||!['stop','gap','deviation','decision'].includes(x.category)))return send(422,{error:'invalid_schema'});return send(200,{schema_version:1,source:'local_unverified_snapshot',verified_runtime:false,items:doc.items})}catch{return send(503,{error:'evidence_unavailable'})}}
+if(!Object.hasOwn(paths,req.url))return send(404,{error:'not_found'});
+try{const content=await readFile(resolve(base,paths[req.url]),'utf8');send(200,content,req.url.endsWith('.css')?'text/css; charset=utf-8':req.url.endsWith('.js')?'text/javascript; charset=utf-8':'text/html; charset=utf-8')}catch{send(503,{error:'asset_unavailable'})}
+}).listen(port,host,()=>console.log('Mimer local control API',host,port));
