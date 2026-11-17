@@ -1,0 +1,20 @@
+name: Control center regression
+on:
+  pull_request:
+    paths:
+      - 'kontroll/**'
+      - 'kontroll-server/**'
+      - '.github/workflows/control-center-test.yml'
+  workflow_dispatch:
+jobs:
+  local-api-contract:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify read-only API and authentication
+        run: node --test kontroll-server/test/api.test.mjs
