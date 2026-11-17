@@ -17,4 +17,4 @@ jobs:
         with:
           node-version: '24'
       - name: Verify read-only API and authentication
-        run: node --test kontroll-server/test/api.test.mjs
+        run: node --test kontroll-server/test/*.test.mjs
